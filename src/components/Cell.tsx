@@ -20,7 +20,7 @@ function Cell({
   const content = () => {
     switch (revealed) {
       case true:
-        return hazardousness ?? "";
+        return hazardousness || "";
 
       case false:
         switch (flagged) {

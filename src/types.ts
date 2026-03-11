@@ -15,3 +15,13 @@ export interface CellData {
 }
 
 export type Cells = Record<CellId, CellData>;
+
+export type GameState = "idle" | "play" | "victory" | "defeat";
+
+export type Difficulty = "easy" | "medium" | "hard";
+
+export interface GameSettings {
+  rowCount: number;
+  columnCount: number;
+  bombCount: number;
+}

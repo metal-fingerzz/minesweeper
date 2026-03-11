@@ -1,24 +1,71 @@
 import { useState } from "react";
-import type { CellData, CellId, Cells, Coordinates } from "../types";
+import type {
+  CellData,
+  CellId,
+  Cells,
+  Coordinates,
+  GameSettings,
+  GameState,
+  Hazardousness,
+} from "../types";
 import Field from "./Field";
 import Timer from "./Timer";
 
-type GameState = "idle" | "play" | "pause" | "victory" | "defeat";
+interface GameProperties {
+  settings: GameSettings;
+}
 
-function Game() {
-  const [state, setState] = useState<GameState>("idle");
-  const [counter] = useState<number>(0);
-  const [cells, setCells] = useState<Cells>({});
+function Game({ settings }: GameProperties) {
+  const [gameState, setGameState] = useState<GameState>("idle");
+
+  const emptyCells = (): Cells => {
+    const cells: Cells = {};
+
+    for (let y = 0; y < settings.rowCount; y++) {
+      for (let x = 0; x < settings.columnCount; x++) {
+        cells[`${x},${y}`] = {
+          coordinates: { x, y },
+          hazardousness: 0,
+          flagged: false,
+          revealed: false,
+        };
+      }
+    }
+
+    return cells;
+  };
+
+  const [cells, setCells] = useState<Cells>(emptyCells());
+
+  const bombIds = (click: Coordinates): CellId[] => {
+    const clickId: CellId = `${click.x},${click.y}`;
+    const cellIds = Object.keys(cells) as CellId[];
+    const bombIds: CellId[] = [];
+
+    while (bombIds.length < settings.bombCount) {
+      const i: number = Math.floor(Math.random() * cellIds.length);
+      const cellId: CellId = cellIds[i];
+      if (cellId === clickId || bombIds.includes(cellId)) continue;
+      bombIds.push(cellId);
+    }
+
+    return bombIds;
+  };
 
   const adjacentCoordinates = (center: Coordinates): Coordinates[] => {
     const { x, y } = center;
     const adjacentCoordinates: Coordinates[] = [];
 
-    for (let dx = -1; dx++; dx <= 1) {
-      for (let dy = -1; dy++; dy <= 1) {
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
         if (dx === 0 && dy === 0) continue;
+
         const abscissa: number = x + dx;
+        if (abscissa < 0 || abscissa > settings.columnCount - 1) continue;
+
         const ordinate: number = y + dy;
+        if (ordinate < 0 || ordinate > settings.rowCount - 1) continue;
+
         adjacentCoordinates.push({ x: abscissa, y: ordinate });
       }
     }
@@ -26,9 +73,40 @@ function Game() {
     return adjacentCoordinates;
   };
 
+  const initCells = (click: Coordinates): void => {
+    setCells((cells) => {
+      const newCells: Cells = { ...cells };
+
+      for (const bombId of bombIds(click)) {
+        newCells[bombId] = {
+          ...newCells[bombId],
+          hazardousness: "💣",
+        };
+
+        const [x, y] = bombId.split(",").map((value) => Number(value)) as [
+          number,
+          number,
+        ];
+
+        for (const coordinates of adjacentCoordinates({ x, y })) {
+          const cellId: CellId = `${coordinates.x},${coordinates.y}`;
+          const { hazardousness }: CellData = newCells[cellId];
+          if (hazardousness === "💣") continue;
+          newCells[cellId] = {
+            ...newCells[cellId],
+            hazardousness: (hazardousness + 1) as Hazardousness,
+          };
+        }
+      }
+
+      return newCells;
+    });
+  };
+
   const spreadReveal = (origin: Coordinates, toBeRevealed: CellId[]): void => {
     for (const { x, y } of adjacentCoordinates(origin)) {
       const cellId: CellId = `${x},${y}`;
+      if (toBeRevealed.includes(cellId)) continue;
       const { hazardousness }: CellData = cells[cellId];
 
       switch (hazardousness) {
@@ -45,41 +123,49 @@ function Game() {
     }
   };
 
+  const onCellLeftClick = ({ x, y }: Coordinates): void => {
+    if (gameState === "idle") {
+      initCells({ x, y });
+      setGameState("play");
+    }
+
+    const cellId: CellId = `${x},${y}`;
+    const { hazardousness, flagged, revealed }: CellData = cells[cellId];
+
+    if (flagged || revealed) return;
+
+    const toBeRevealed: CellId[] = [cellId];
+
+    switch (hazardousness) {
+      case 0:
+        spreadReveal({ x, y }, toBeRevealed);
+        break;
+      case "💣":
+        setGameState("defeat");
+        break;
+    }
+
+    setCells((cells) => {
+      const newCells: Cells = { ...cells };
+
+      for (const cellId of toBeRevealed) {
+        newCells[cellId] = {
+          ...newCells[cellId],
+          flagged: false,
+          revealed: true,
+        };
+      }
+
+      return newCells;
+    });
+  };
+
   return (
     <div>
-      <Timer counter={counter} />
+      <Timer gameState={gameState} />
       <Field
         cells={cells}
-        onCellLeftClick={({ x, y }) => {
-          if (state === "idle") setState("play");
-
-          const cellId: CellId = `${x},${y}`;
-          const { hazardousness, flagged, revealed }: CellData = cells[cellId];
-
-          if (flagged || revealed) return;
-
-          const toBeRevealed: CellId[] = [cellId];
-
-          switch (hazardousness) {
-            case 0:
-              spreadReveal({ x, y }, toBeRevealed);
-              break;
-            case "💣":
-              setState("defeat");
-              break;
-          }
-
-          setCells((cells) => {
-            for (const cellId of toBeRevealed) {
-              cells[cellId] = {
-                ...cells[cellId],
-                flagged: false,
-                revealed: true,
-              };
-            }
-            return cells;
-          });
-        }}
+        onCellLeftClick={onCellLeftClick}
         onCellRightClick={() => {}}
       />
     </div>

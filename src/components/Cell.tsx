@@ -2,8 +2,9 @@ import type { Coordinates, Hazardousness } from "../types";
 
 interface CellProperties {
   coordinates: Coordinates;
-  hazardousness: Hazardousness;
   flagged: boolean;
+  hazardousness: Hazardousness;
+  playable: boolean;
   revealed: boolean;
   onLeftClick: (coordinates: Coordinates) => void;
   onRightClick: (coordinates: Coordinates) => void;
@@ -11,8 +12,9 @@ interface CellProperties {
 
 function Cell({
   coordinates,
-  hazardousness,
   flagged,
+  hazardousness,
+  playable,
   revealed,
   onLeftClick,
   onRightClick,
@@ -33,11 +35,18 @@ function Cell({
     }
   };
 
+  const onClick = (): void => {
+    if (!playable) return;
+    onLeftClick(coordinates);
+  };
+
+  const onContextMenu = (): void => {
+    if (!playable) return;
+    onRightClick(coordinates);
+  };
+
   return (
-    <div
-      onClick={() => onLeftClick(coordinates)}
-      onContextMenu={() => onRightClick(coordinates)}
-    >
+    <div onClick={onClick} onContextMenu={onContextMenu}>
       {content()}
     </div>
   );

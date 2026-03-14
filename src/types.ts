@@ -16,7 +16,7 @@ export interface CellData {
 
 export type Cells = Record<CellId, CellData>;
 
-export type GameState = "idle" | "play" | "victory" | "defeat";
+export type GameState = "idle" | "playing" | "victory" | "defeat";
 
 export type Difficulty = "easy" | "medium" | "hard";
 

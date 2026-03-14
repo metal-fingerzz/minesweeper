@@ -17,6 +17,7 @@ interface GameProperties {
 
 function Game({ settings }: GameProperties) {
   const [gameState, setGameState] = useState<GameState>("idle");
+  const [playable, setPlayable] = useState<boolean>(true);
 
   const emptyCells = (): Cells => {
     const cells: Cells = {};
@@ -105,29 +106,36 @@ function Game({ settings }: GameProperties) {
     return newCells;
   };
 
-  const spreadReveal = (origin: Coordinates, currentCells: Cells): void => {
+  const isVictory = (cells: Cells): boolean => {
+    return (
+      Object.values(cells).filter((cell) => !cell.revealed).length ===
+      settings.bombCount
+    );
+  };
+
+  const spreadReveal = (origin: Coordinates, cells: Cells): void => {
     for (const { x, y } of adjacentCoordinates(origin)) {
       const cellId: CellId = `${x},${y}`;
-      const { hazardousness, revealed }: CellData = currentCells[cellId];
+      const { hazardousness, revealed }: CellData = cells[cellId];
 
       if (revealed) continue;
 
       switch (hazardousness) {
         case 0:
-          currentCells[cellId] = {
-            ...currentCells[cellId],
+          cells[cellId] = {
+            ...cells[cellId],
             flagged: false,
             revealed: true,
           };
-          spreadReveal({ x, y }, currentCells);
+          spreadReveal({ x, y }, cells);
           break;
 
         case "💣":
           continue;
 
         default:
-          currentCells[cellId] = {
-            ...currentCells[cellId],
+          cells[cellId] = {
+            ...cells[cellId],
             flagged: false,
             revealed: true,
           };
@@ -137,36 +145,46 @@ function Game({ settings }: GameProperties) {
   };
 
   const onCellLeftClick = ({ x, y }: Coordinates): void => {
-    let currentCells: Cells = { ...cells };
+    setPlayable(false);
+    let newCells: Cells;
 
     if (gameState === "idle") {
-      currentCells = initCells({ x, y });
-      setGameState("play");
-    }
+      newCells = initCells({ x, y });
+      setGameState("playing");
+    } else newCells = { ...cells };
 
     const cellId: CellId = `${x},${y}`;
-    const { hazardousness, flagged, revealed }: CellData = currentCells[cellId];
+    const { hazardousness, flagged, revealed }: CellData = newCells[cellId];
 
     if (flagged || revealed) return;
 
-    currentCells[cellId] = {
-      ...currentCells[cellId],
+    newCells[cellId] = {
+      ...newCells[cellId],
       revealed: true,
     };
 
     switch (hazardousness) {
       case 0:
-        spreadReveal({ x, y }, currentCells);
+        spreadReveal({ x, y }, newCells);
         break;
       case "💣":
+        setCells(newCells);
         setGameState("defeat");
-        break;
+        return;
     }
 
-    setCells(currentCells);
+    if (isVictory(newCells)) {
+      setCells(newCells);
+      setGameState("victory");
+      return;
+    }
+
+    setCells(newCells);
+    setPlayable(true);
   };
 
   const onCellRightClick = ({ x, y }: Coordinates): void => {
+    setPlayable(false);
     const cellId: CellId = `${x},${y}`;
     const { revealed, flagged }: CellData = cells[cellId];
 
@@ -184,6 +202,7 @@ function Game({ settings }: GameProperties) {
       };
       return newCells;
     });
+    setPlayable(true);
   };
 
   return (
@@ -191,6 +210,7 @@ function Game({ settings }: GameProperties) {
       <Timer gameState={gameState} />
       <Field
         cells={cells}
+        playable={playable}
         onCellLeftClick={onCellLeftClick}
         onCellRightClick={onCellRightClick}
       />

@@ -156,7 +156,10 @@ function Game({ settings }: GameProperties) {
     const cellId: CellId = `${x},${y}`;
     const { hazardousness, flagged, revealed }: CellData = newCells[cellId];
 
-    if (flagged || revealed) return;
+    if (flagged || revealed) {
+      setPlayable(true);
+      return;
+    }
 
     newCells[cellId] = {
       ...newCells[cellId],
@@ -188,10 +191,16 @@ function Game({ settings }: GameProperties) {
     const cellId: CellId = `${x},${y}`;
     const { revealed, flagged }: CellData = cells[cellId];
 
-    if (revealed) return;
+    if (revealed) {
+      setPlayable(true);
+      return;
+    }
 
     if (!flagged) {
-      if (flagCount() === settings.bombCount) return;
+      if (flagCount() === settings.bombCount) {
+        setPlayable(true);
+        return;
+      }
     }
 
     setCells((cells) => {

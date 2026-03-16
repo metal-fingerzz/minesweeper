@@ -15,7 +15,7 @@ function Field({
   onCellRightClick,
 }: FieldProperties) {
   return (
-    <div>
+    <div className="w-full flex flex-wrap">
       {Object.entries(cells).map(([cellId, cellData]) => (
         <Cell
           key={cellId}

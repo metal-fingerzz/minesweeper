@@ -16,17 +16,17 @@ interface GameProperties {
 }
 
 function Game({ settings }: GameProperties) {
-  const [gameState, setGameState] = useState<GameState>("idle");
-  const [playable, setPlayable] = useState<boolean>(true);
+  const [gameState, setGameState] = useState<GameState>("idle"); // Tracks the lifecycle of the current round
+  const [playable, setPlayable] = useState<boolean>(true); // Temporarily false while a click handler is computing, to block concurrent clicks
 
   const emptyCells = (): Cells => {
     const cells: Cells = {};
 
     for (let y = 0; y < settings.rowCount; y++) {
       for (let x = 0; x < settings.columnCount; x++) {
-        cells[`${x},${y}`] = {
+        cells[`${x},${y}`] = { // Insert in row-major order so Object.entries() yields cells top-to-bottom, left-to-right
           coordinates: { x, y },
-          hazardousness: 0,
+          hazardousness: 0, // All cells start as empty — bombs are placed on the first click (safe first click guarantee)
           flagged: false,
           revealed: false,
         };
@@ -36,21 +36,21 @@ function Game({ settings }: GameProperties) {
     return cells;
   };
 
-  const [cells, setCells] = useState<Cells>(emptyCells());
+  const [cells, setCells] = useState<Cells>(emptyCells()); // Grid initialized once; bombs are placed lazily on first click
 
   const flagCount = (): number => {
-    return Object.values(cells).filter((cell) => cell.flagged).length;
+    return Object.values(cells).filter((cell) => cell.flagged).length; // Count placed flags to enforce the bombCount cap
   };
 
   const bombIds = (click: Coordinates): CellId[] => {
-    const clickId: CellId = `${click.x},${click.y}`;
+    const clickId: CellId = `${click.x},${click.y}`; // The clicked cell is excluded so the first click is always safe
     const cellIds = Object.keys(cells) as CellId[];
     const bombIds: CellId[] = [];
 
     while (bombIds.length < settings.bombCount) {
-      const i: number = Math.floor(Math.random() * cellIds.length);
+      const i: number = Math.floor(Math.random() * cellIds.length); // Pick a random cell index
       const cellId: CellId = cellIds[i];
-      if (cellId === clickId || bombIds.includes(cellId)) continue;
+      if (cellId === clickId || bombIds.includes(cellId)) continue; // Skip the clicked cell and duplicates
       bombIds.push(cellId);
     }
 
@@ -63,42 +63,42 @@ function Game({ settings }: GameProperties) {
 
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
-        if (dx === 0 && dy === 0) continue;
+        if (dx === 0 && dy === 0) continue; // Skip the center cell itself
 
         const abscissa: number = x + dx;
-        if (abscissa < 0 || abscissa > settings.columnCount - 1) continue;
+        if (abscissa < 0 || abscissa > settings.columnCount - 1) continue; // Clamp to grid bounds horizontally
 
         const ordinate: number = y + dy;
-        if (ordinate < 0 || ordinate > settings.rowCount - 1) continue;
+        if (ordinate < 0 || ordinate > settings.rowCount - 1) continue; // Clamp to grid bounds vertically
 
         adjacentCoordinates.push({ x: abscissa, y: ordinate });
       }
     }
 
-    return adjacentCoordinates;
+    return adjacentCoordinates; // Up to 8 neighbors (fewer on edges and corners)
   };
 
   const initCells = (click: Coordinates): Cells => {
-    const newCells: Cells = { ...cells };
+    const newCells: Cells = { ...cells }; // Shallow copy — cell objects are replaced, never mutated in place
 
     for (const bombId of bombIds(click)) {
       newCells[bombId] = {
         ...newCells[bombId],
-        hazardousness: "💣",
+        hazardousness: "💣", // Mark this cell as a bomb
       };
 
       const [x, y] = bombId.split(",").map((value) => Number(value)) as [
         number,
         number,
-      ];
+      ]; // Parse the CellId back into coordinates to iterate its neighbors
 
       for (const coordinates of adjacentCoordinates({ x, y })) {
         const cellId: CellId = `${coordinates.x},${coordinates.y}`;
         const { hazardousness }: CellData = newCells[cellId];
-        if (hazardousness === "💣") continue;
+        if (hazardousness === "💣") continue; // Don't overwrite another bomb with a number
         newCells[cellId] = {
           ...newCells[cellId],
-          hazardousness: (hazardousness + 1) as Hazardousness,
+          hazardousness: (hazardousness + 1) as Hazardousness, // Increment the adjacent bomb counter
         };
       }
     }
@@ -109,35 +109,36 @@ function Game({ settings }: GameProperties) {
   const isVictory = (cells: Cells): boolean => {
     return (
       Object.values(cells).filter((cell) => !cell.revealed).length ===
-      settings.bombCount
+      settings.bombCount // Victory when the only unrevealed cells are exactly the bombs
     );
   };
 
+  // Recursively reveals all connected empty (hazardousness === 0) cells and their numeric borders
   const spreadReveal = (origin: Coordinates, cells: Cells): void => {
     for (const { x, y } of adjacentCoordinates(origin)) {
       const cellId: CellId = `${x},${y}`;
       const { hazardousness, revealed }: CellData = cells[cellId];
 
-      if (revealed) continue;
+      if (revealed) continue; // Already revealed — skip to avoid infinite recursion
 
       switch (hazardousness) {
         case 0:
           cells[cellId] = {
             ...cells[cellId],
-            flagged: false,
+            flagged: false, // Remove any flag before revealing
             revealed: true,
           };
-          spreadReveal({ x, y }, cells);
+          spreadReveal({ x, y }, cells); // Recurse into this empty cell's neighbors
           break;
 
         case "💣":
-          continue;
+          continue; // Never auto-reveal bombs during flood fill
 
         default:
           cells[cellId] = {
             ...cells[cellId],
-            flagged: false,
-            revealed: true,
+            flagged: false, // Remove any flag before revealing
+            revealed: true, // Reveal numeric border cell but don't recurse further
           };
           break;
       }
@@ -145,60 +146,60 @@ function Game({ settings }: GameProperties) {
   };
 
   const onCellLeftClick = ({ x, y }: Coordinates): void => {
-    setPlayable(false);
+    setPlayable(false); // Block further clicks until this handler finishes
     let newCells: Cells;
 
     if (gameState === "idle") {
-      newCells = initCells({ x, y });
+      newCells = initCells({ x, y }); // First click: place bombs and start the timer
       setGameState("playing");
-    } else newCells = { ...cells };
+    } else newCells = { ...cells }; // Subsequent clicks: work on a shallow copy of the current grid
 
     const cellId: CellId = `${x},${y}`;
     const { hazardousness, flagged, revealed }: CellData = newCells[cellId];
 
     if (flagged || revealed) {
-      setPlayable(true);
+      setPlayable(true); // Nothing to do — re-enable clicks and return early
       return;
     }
 
     newCells[cellId] = {
       ...newCells[cellId],
-      revealed: true,
+      revealed: true, // Reveal the clicked cell
     };
 
     switch (hazardousness) {
       case 0:
-        spreadReveal({ x, y }, newCells);
+        spreadReveal({ x, y }, newCells); // Flood-fill reveal all connected empty cells
         break;
       case "💣":
-        setCells(newCells);
+        setCells(newCells); // Commit the revealed bomb before switching state
         setGameState("defeat");
-        return;
+        return; // Don't call setPlayable — the game is over
     }
 
     if (isVictory(newCells)) {
       setCells(newCells);
       setGameState("victory");
-      return;
+      return; // Don't call setPlayable — the game is over
     }
 
     setCells(newCells);
-    setPlayable(true);
+    setPlayable(true); // Re-enable clicks for the next turn
   };
 
   const onCellRightClick = ({ x, y }: Coordinates): void => {
-    setPlayable(false);
+    setPlayable(false); // Block further clicks until this handler finishes
     const cellId: CellId = `${x},${y}`;
     const { revealed, flagged }: CellData = cells[cellId];
 
     if (revealed) {
-      setPlayable(true);
+      setPlayable(true); // Can't flag a revealed cell
       return;
     }
 
     if (!flagged) {
       if (flagCount() === settings.bombCount) {
-        setPlayable(true);
+        setPlayable(true); // Flag cap reached — don't allow placing another flag
         return;
       }
     }
@@ -207,10 +208,10 @@ function Game({ settings }: GameProperties) {
       const newCells: Cells = { ...cells };
       newCells[cellId] = {
         ...newCells[cellId],
-        flagged: !flagged,
+        flagged: !flagged, // Toggle the flag on the cell
       };
       return newCells;
-    });
+    }); // Functional update form used here because flagCount() already read the stale `cells` snapshot
     setPlayable(true);
   };
 
@@ -220,6 +221,7 @@ function Game({ settings }: GameProperties) {
       <Field
         cells={cells}
         playable={playable}
+        settings={settings}
         onCellLeftClick={onCellLeftClick}
         onCellRightClick={onCellRightClick}
       />

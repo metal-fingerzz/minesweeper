@@ -29,7 +29,7 @@ function Cell({
   const styles = (): string => {
     const width: string =
       settings.columnCount === 16 ? "w-[6.25%]" : "w-[11.11%]"; // 100% / 16 ≈ 6.25%, 100% / 9 ≈ 11.11% — each cell fills exactly one column
-    let styles: string = `${width} aspect-square cursor-pointer`; // Square cells regardless of grid size
+    let styles: string = `${width} aspect-square cursor-pointer flex items-center justify-center`; // Square cells regardless of grid size; flex centers content on both axes
 
     if (!revealed) return `${styles} border-4 border-outset bg-gray-200`; // Unrevealed: raised 3-D border effect
 

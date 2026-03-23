@@ -21,23 +21,39 @@ function Cell({
   onLeftClick,
   onRightClick,
 }: CellProperties) {
+  // Classic Windows number colors (1–8)
+  const numberColors: Partial<Record<Hazardousness, string>> = {
+    1: "#0000FF",
+    2: "#008000",
+    3: "#FF0000",
+    4: "#000080",
+    5: "#800000",
+    6: "#008080",
+    7: "#000000",
+    8: "#808080",
+  };
+
   const content = () => {
     if (!revealed) return flagged ? "🚩" : ""; // Unrevealed: show flag or nothing
-    return hazardousness || ""; // Revealed: show bomb emoji, digit (1–8), or empty string for 0
+    if (!hazardousness) return ""; // 0 → empty cell, nothing to display
+    if (hazardousness === "💣") return "💣";
+    return (
+      <span style={{ color: numberColors[hazardousness] }}>
+        {hazardousness}
+      </span>
+    ); // Digit colored per Windows convention
   };
 
   const styles = (): string => {
     const width: string =
       settings.columnCount === 16 ? "w-[6.25%]" : "w-[11.11%]"; // 100% / 16 ≈ 6.25%, 100% / 9 ≈ 11.11% — each cell fills exactly one column
-    let styles: string = `${width} aspect-square cursor-pointer flex items-center justify-center`; // Square cells regardless of grid size; flex centers content on both axes
+    const base: string = `${width} aspect-square cursor-pointer flex items-center justify-center font-bold`; // Square cells regardless of grid size; flex centers content on both axes
 
-    if (!revealed) return `${styles} border-4 border-outset bg-gray-200`; // Unrevealed: raised 3-D border effect
+    if (!revealed) return `${base} cell-raised bg-win-silver`; // Unrevealed: raised 3-D border effect (white top/left, black bottom/right)
 
-    styles += " border"; // Revealed: flat single border
+    if (hazardousness === "💣") return `${base} cell-flat bg-win-red`; // Bomb cell: red background on reveal — bg-win-silver absent to avoid conflict
 
-    if (hazardousness === "💣") return `${styles} bg-red-500`; // Bomb cell: red background on reveal
-
-    return `${styles} bg-gray-300`; // Safe revealed cell: flat gray
+    return `${base} cell-flat bg-win-silver`; // Safe revealed cell: flat border, silver background
   };
 
   const onClick = (

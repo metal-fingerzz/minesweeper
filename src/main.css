@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
-@utility border-outset {
-  border-style: outset;
+@theme {
+  --color-win-silver: #c0c0c0;
+  --color-win-red: #ff0000;
+}
+
+@utility cell-raised {
+  border-width: 5px;
+  border-style: solid;
+  border-top-color: #ffffff;
+  border-left-color: #ffffff;
+  border-bottom-color: #000000;
+  border-right-color: #000000;
+}
+
+@utility cell-flat {
+  border-width: 1px;
+  border-style: solid;
+  border-color: #808080;
 }
